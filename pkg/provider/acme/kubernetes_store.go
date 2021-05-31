@@ -49,6 +49,8 @@ type KubernetesStore struct {
 // given URI with this format: `kubernetes://:endpoint:/:namespace:`. The endpoint
 // (or host:port part) of the uri is optional. Example: `kubernetes:///default`
 func KubernetesStoreFromURI(uri string) (*KubernetesStore, error) {
+	logger := log.WithoutContext().WithField(log.ProviderName, "acme")
+	logger.Debugf("KubernetesStoreFromURI %s", uri)
 	u, err := url.Parse(uri)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse %q: %w", uri, err)
@@ -66,6 +68,9 @@ func KubernetesStoreFromURI(uri string) (*KubernetesStore, error) {
 // clientset and start a resource watcher for stored sercrets.
 // It will create a clientset with the default 'in-cluster' config.
 func NewKubernetesStore(namespace, endpoint string) (*KubernetesStore, error) {
+//	logger := log.WithoutContext().WithField(log.ProviderName, "acme")
+//	logger.Debug("NewKubernetesStore")
+
 	store := &KubernetesStore{
 		ctx:       context.Background(),
 		namespace: namespace,
@@ -94,6 +99,8 @@ func NewKubernetesStore(namespace, endpoint string) (*KubernetesStore, error) {
 // either from cache (which is maintained by the watcher and Save* operations)
 // or it will fetch the resource fresh.
 func (s *KubernetesStore) GetAccount(resolverName string) (*Account, error) {
+//	logger := log.WithoutContext().WithField(log.ProviderName, "acme")
+//	logger.Debug("GetAccount")
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -120,6 +127,8 @@ func (s *KubernetesStore) GetAccount(resolverName string) (*Account, error) {
 // resolverName with the given account data. When the secret did not exist it is
 // created with the correct labels set.
 func (s *KubernetesStore) SaveAccount(resolverName string, account *Account) error {
+	logger := log.WithoutContext().WithField(log.ProviderName, "acme")
+	logger.Debug("SaveAccount")
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -169,6 +178,7 @@ func (s *KubernetesStore) SaveAccount(resolverName string, account *Account) err
 // or it will fetch the resource fresh.
 func (s *KubernetesStore) GetCertificates(resolverName string) ([]*CertAndStore, error) {
 	logger := log.WithoutContext().WithField(log.ProviderName, "acme")
+	logger.Debug("GetCertificates")
 
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
@@ -210,6 +220,7 @@ func (s *KubernetesStore) GetCertificates(resolverName string) ([]*CertAndStore,
 // created with the correct labels set.
 func (s *KubernetesStore) SaveCertificates(resolverName string, certs []*CertAndStore) error {
 	logger := log.WithoutContext().WithField(log.ProviderName, "acme")
+	logger.Debug("SaveCertificates")
 
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
@@ -267,6 +278,7 @@ func (s *KubernetesStore) SaveCertificates(resolverName string, certs []*CertAnd
 
 func (s *KubernetesStore) watcher() {
 	logger := log.WithoutContext().WithField(log.ProviderName, "acme")
+	logger.Debug("watcher")
 
 	watcher, err := s.client.CoreV1().Secrets(s.namespace).Watch(s.ctx, metav1.ListOptions{
 		Watch:         true,
@@ -298,6 +310,8 @@ func (s *KubernetesStore) watcher() {
 }
 
 func (s *KubernetesStore) getSecretLocked(resolverName string) (*v1.Secret, error) {
+	logger := log.WithoutContext().WithField(log.ProviderName, "acme")
+	logger.Debug("getSecretLocked")
 	if _, found := s.cache[resolverName]; !found {
 		secret, err := s.client.CoreV1().Secrets(s.namespace).Get(s.ctx, secretName(resolverName), metav1.GetOptions{})
 		status := &k8serrors.StatusError{}
