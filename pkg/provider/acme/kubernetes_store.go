@@ -222,7 +222,7 @@ func (s *KubernetesStore) GetCertificates(resolverName string) ([]*CertAndStore,
 // created with the correct labels set.
 func (s *KubernetesStore) SaveCertificates(resolverName string, certs []*CertAndStore) error {
 	logger := log.WithoutContext().WithField(log.ProviderName, "acme")
-	logger.Debug("SaveCertificates")
+	logger.Debugf("SaveCertificates resolverName %s", resolverName)
 
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
