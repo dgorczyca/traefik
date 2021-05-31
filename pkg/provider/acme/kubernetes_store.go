@@ -231,6 +231,7 @@ func (s *KubernetesStore) SaveCertificates(resolverName string, certs []*CertAnd
 	creationData := make(map[string][]byte)
 
 	for _, cert := range certs {
+		logger.Debugf("SaveCertificates for %s", cert.Domain.Main)
 		if cert.Domain.Main == "" {
 			logger.Warn("not saving a certificate without a main domainname")
 
@@ -241,6 +242,8 @@ func (s *KubernetesStore) SaveCertificates(resolverName string, certs []*CertAnd
 		if err != nil {
 			return fmt.Errorf("failed to marshale account: %w", err)
 		}
+
+		logger.Debugf("SaveCertificates data %s", data)
 
 		patches = append(patches, patch{
 			Op:    "replace",
@@ -253,6 +256,8 @@ func (s *KubernetesStore) SaveCertificates(resolverName string, certs []*CertAnd
 
 	payload, _ := json.Marshal(patches)
 	secret, err := s.client.CoreV1().Secrets(s.namespace).Patch(s.ctx, secretName(resolverName), types.JSONPatchType, payload, metav1.PatchOptions{})
+
+	logger.Debugf("SaveCertificates %s", err)
 
 	status := &k8serrors.StatusError{}
 	if err != nil && errors.As(err, &status) && status.Status().Code == 404 {
@@ -267,11 +272,15 @@ func (s *KubernetesStore) SaveCertificates(resolverName string, certs []*CertAnd
 			Data: creationData,
 		}
 		secret, err = s.client.CoreV1().Secrets(s.namespace).Create(s.ctx, secret, metav1.CreateOptions{FieldManager: FieldManager})
+
+		logger.Debugf("SaveCertificates secret %s", secret)
 	}
 
 	if err != nil {
 		return fmt.Errorf("failed to patch secret: %w", err)
 	}
+
+	logger.Debugf("SaveCertificates all good? %s", resolverName)
 
 	s.cache[resolverName] = *secret
 
