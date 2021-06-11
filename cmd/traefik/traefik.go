@@ -370,14 +370,16 @@ func initACMEProvider(c *static.Configuration, providerAggregator *aggregator.Pr
 
 	var resolvers []*acme.Provider
 	for name, resolver := range c.CertificatesResolvers {
+	    log.WithoutContext().Debugf("Resolver acme is null? %s", resolver.ACME == nil)
 		if resolver.ACME == nil {
 			continue
 		}
 
+	    log.WithoutContext().Debugf("stores resolver acme storage is? %s", stores[resolver.ACME.Storage])
 		if stores[resolver.ACME.Storage] == nil {
+            log.WithoutContext().Debugf("Storage is %s and hasPrefix is %v", resolver.ACME.Storage, strings.HasPrefix(resolver.ACME.Storage, "kubernetes://"))
 			if strings.HasPrefix(resolver.ACME.Storage, "kubernetes://") {
 				var err error
-				log.WithoutContext().Debugf("Storage is %s", resolver.ACME.Storage)
 				stores[resolver.ACME.Storage], err = acme.KubernetesStoreFromURI(resolver.ACME.Storage)
 				log.WithoutContext().Debugf("Error is %s", err)
 				if err != nil {
