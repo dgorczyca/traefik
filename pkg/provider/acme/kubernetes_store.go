@@ -56,8 +56,8 @@ func KubernetesStoreFromURI(uri string) (*KubernetesStore, error) {
 		logger.Debugf("failed parsing")
 		return nil, fmt.Errorf("failed to parse %q: %w", uri, err)
 	}
-	logger.Debugf("parsed successfully u: %s namespace: %s", u, namespace)
 	namespace := u.Path[1:]
+	logger.Debugf("parsed successfully u: %s namespace: %s", u, namespace)
 	endpoint := ""
 	if u.Host != "" {
 		endpoint = u.Host
