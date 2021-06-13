@@ -136,7 +136,7 @@ func (s *KubernetesStore) SaveAccount(resolverName string, account *Account) err
 	defer s.mutex.Unlock()
 
 	data, err := json.Marshal(account)
-	logger.Debugf("SaveAccount data: %s" data)
+	logger.Debugf("SaveAccount data: %s", data)
 	if err != nil {
 		return fmt.Errorf("failed to marshale account: %w", err)
 	}
