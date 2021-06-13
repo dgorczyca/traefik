@@ -56,7 +56,7 @@ func KubernetesStoreFromURI(uri string) (*KubernetesStore, error) {
 		logger.Debugf("failed parsing")
 		return nil, fmt.Errorf("failed to parse %q: %w", uri, err)
 	}
-	logger.Debugf("parsed successfully %s", u)
+	logger.Debugf("parsed successfully u: %s namespace: %s", u, namespace)
 	namespace := u.Path[1:]
 	endpoint := ""
 	if u.Host != "" {
@@ -70,8 +70,7 @@ func KubernetesStoreFromURI(uri string) (*KubernetesStore, error) {
 // clientset and start a resource watcher for stored sercrets.
 // It will create a clientset with the default 'in-cluster' config.
 func NewKubernetesStore(namespace, endpoint string) (*KubernetesStore, error) {
-//	logger := log.WithoutContext().WithField(log.ProviderName, "acme")
-//	logger.Debug("NewKubernetesStore")
+	logger := log.WithoutContext().WithField(log.ProviderName, "acme")
 
 	store := &KubernetesStore{
 		ctx:       context.Background(),
@@ -79,6 +78,7 @@ func NewKubernetesStore(namespace, endpoint string) (*KubernetesStore, error) {
 		mutex:     &sync.Mutex{},
 		cache:     make(map[string]v1.Secret),
 	}
+	logger.Debugf("NewKubernetesStore store: %s", store)
 
 	config, err := rest.InClusterConfig()
 	if err != nil {
@@ -87,6 +87,7 @@ func NewKubernetesStore(namespace, endpoint string) (*KubernetesStore, error) {
 	if endpoint != "" {
 		config.Host = endpoint
 	}
+	logger.Debugf("NewKubernetesStore config: %s", config)
 	store.client, err = kubernetes.NewForConfig(config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create kubernetes clientset: %w", err)
@@ -101,12 +102,13 @@ func NewKubernetesStore(namespace, endpoint string) (*KubernetesStore, error) {
 // either from cache (which is maintained by the watcher and Save* operations)
 // or it will fetch the resource fresh.
 func (s *KubernetesStore) GetAccount(resolverName string) (*Account, error) {
-//	logger := log.WithoutContext().WithField(log.ProviderName, "acme")
-//	logger.Debug("GetAccount")
+	logger := log.WithoutContext().WithField(log.ProviderName, "acme")
+
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
 	secret, err := s.getSecretLocked(resolverName)
+	logger.Debugf("GetAccount secretLocked: %s secret: %s", resolverName, secret)
 	if secret == nil || err != nil {
 		return nil, err
 	}
@@ -130,11 +132,11 @@ func (s *KubernetesStore) GetAccount(resolverName string) (*Account, error) {
 // created with the correct labels set.
 func (s *KubernetesStore) SaveAccount(resolverName string, account *Account) error {
 	logger := log.WithoutContext().WithField(log.ProviderName, "acme")
-	logger.Debug("SaveAccount")
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
 	data, err := json.Marshal(account)
+	logger.Debugf("SaveAccount data: %s" data)
 	if err != nil {
 		return fmt.Errorf("failed to marshale account: %w", err)
 	}
@@ -180,12 +182,12 @@ func (s *KubernetesStore) SaveAccount(resolverName string, account *Account) err
 // or it will fetch the resource fresh.
 func (s *KubernetesStore) GetCertificates(resolverName string) ([]*CertAndStore, error) {
 	logger := log.WithoutContext().WithField(log.ProviderName, "acme")
-	logger.Debug("GetCertificates")
 
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
 	secret, err := s.getSecretLocked(resolverName)
+	logger.Debugf("GetCertificates %s with resolverName %s", secret, resolverName)
 	if secret == nil || err != nil {
 		return nil, err
 	}
@@ -193,6 +195,7 @@ func (s *KubernetesStore) GetCertificates(resolverName string) ([]*CertAndStore,
 	var result []*CertAndStore
 
 	for domain, data := range secret.Data {
+	    logger.Debugf("GetCertificates domain: %s", domain)
 		if domain == "account" {
 			continue
 		}
@@ -207,12 +210,16 @@ func (s *KubernetesStore) GetCertificates(resolverName string) ([]*CertAndStore,
 			logger.Warnf("mismatch in cert domain and secret keyname: %q != %q", domain, certAndStore.Domain.Main)
 		}
 
+		logger.Debugf("GetCertificates certAndStore.Domain.Main: %s", certAndStore.Domain.Main)
+
 		result = append(result, certAndStore)
 	}
 
 	sort.Slice(result, func(i, j int) bool {
 		return result[i].Domain.Main < result[j].Domain.Main
 	})
+
+	logger.Debugf("GetCertificates result %s", result)
 
 	return result, nil
 }
@@ -257,7 +264,7 @@ func (s *KubernetesStore) SaveCertificates(resolverName string, certs []*CertAnd
 	payload, _ := json.Marshal(patches)
 	secret, err := s.client.CoreV1().Secrets(s.namespace).Patch(s.ctx, secretName(resolverName), types.JSONPatchType, payload, metav1.PatchOptions{})
 
-	logger.Debugf("SaveCertificates %s", err)
+	logger.Debugf("SaveCertificates error %s, resolverName ", err, resolverName)
 
 	status := &k8serrors.StatusError{}
 	if err != nil && errors.As(err, &status) && status.Status().Code == 404 {
@@ -312,6 +319,7 @@ func (s *KubernetesStore) watcher() {
 			continue
 		}
 		resolver := secret.Labels[LabelResolver]
+	    logger.Debugf("watcher resolver %s", resolver)
 		if resolver != "" {
 			s.mutex.Lock()
 			s.cache[resolver] = *secret
@@ -322,7 +330,6 @@ func (s *KubernetesStore) watcher() {
 
 func (s *KubernetesStore) getSecretLocked(resolverName string) (*v1.Secret, error) {
 	logger := log.WithoutContext().WithField(log.ProviderName, "acme")
-	logger.Debug("getSecretLocked")
 	if _, found := s.cache[resolverName]; !found {
 		secret, err := s.client.CoreV1().Secrets(s.namespace).Get(s.ctx, secretName(resolverName), metav1.GetOptions{})
 		status := &k8serrors.StatusError{}
@@ -335,6 +342,7 @@ func (s *KubernetesStore) getSecretLocked(resolverName string) (*v1.Secret, erro
 		s.cache[resolverName] = *secret
 	}
 	secret := s.cache[resolverName]
+	logger.Debugf("getSecretLocked secret: %s resolverName: %s", secret, resolverName)
 
 	return &secret, nil
 }
